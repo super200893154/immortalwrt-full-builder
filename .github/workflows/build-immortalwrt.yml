@@ -15,8 +15,9 @@ on:
         default: true
         type: boolean
   schedule:
-    # 每天北京时间凌晨 03:00 (UTC 19:00) 自动触发全新编译，跟进官方最新维护分支与上游插件
-    - cron: '0 19 * * *'
+    # 每天北京时间 04:00 (UTC 20:00) 自动编译。
+    # 比作者仓库(UTC 19:00)晚 1 小时，确保上游已推送新代码后再同步构建。
+    - cron: '0 20 * * *'
 
 permissions:
   contents: write
@@ -37,6 +38,69 @@ jobs:
     steps:
     - name: 检出当前仓库代码 (Checkout Repository)
       uses: actions/checkout@v4
+      with:
+        # 需要完整历史才能与上游 merge
+        fetch-depth: 0
+
+    # ------------------------------------------------------------------
+    # 跟随上游 nimo7735/immortalwrt-full-builder 更新，并自动补回内核补丁。
+    # 这一步保证：每次构建都基于作者最新代码，且 CONFIG_KERNEL_FUNCTION_TRACER
+    # 始终为开启状态（honk/dae 的 UDP 追踪与 DNS 分流依赖它）。
+    # 幂等：上游若已自带该配置，不会产生重复行。
+    # ------------------------------------------------------------------
+    - name: 同步上游并应用内核补丁 (Sync upstream & patch kernel config)
+      run: |
+        set -e
+        git config user.name  "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        echo "=================================================="
+        echo "--> 同步上游仓库 nimo7735/immortalwrt-full-builder"
+        echo "=================================================="
+        git remote add upstream https://github.com/nimo7735/immortalwrt-full-builder.git 2>/dev/null || true
+        git fetch upstream main
+        UPSTREAM_SHA=$(git rev-parse upstream/main)
+        echo "上游最新提交: $UPSTREAM_SHA"
+
+        if git merge-base --is-ancestor upstream/main HEAD; then
+          echo "--> 本地已包含上游全部提交，无需合并"
+        else
+          echo "--> 检测到上游更新，开始合并..."
+          if git merge upstream/main --no-edit -m "chore: sync upstream ($UPSTREAM_SHA)"; then
+            echo "--> 合并成功"
+          else
+            echo "--> 合并冲突，改用上游 full.config（本步骤稍后重新打补丁）"
+            git checkout --theirs full.config 2>/dev/null || git checkout upstream/main -- full.config
+            git add -A
+            git -c core.editor=true commit --no-edit -m "chore: sync upstream, resolve conflict by taking upstream full.config" || true
+          fi
+        fi
+
+        echo "=================================================="
+        echo "--> 应用内核补丁"
+        echo "=================================================="
+        # 1) 开启 ftrace 函数追踪器：honk(dae) 用 raw tracepoint 挂 __skb_recv_udp，
+        #    缺此项时 available_tracers 只剩 nop，UDP 接管报 Resource busy。
+        sed -i 's/^# CONFIG_KERNEL_FUNCTION_TRACER is not set/CONFIG_KERNEL_FUNCTION_TRACER=y/' full.config
+        grep -q '^CONFIG_KERNEL_FUNCTION_TRACER=y' full.config \
+          || echo 'CONFIG_KERNEL_FUNCTION_TRACER=y' >> full.config
+
+        # 2) 内核分区 64MB，给开启 ftrace 后增大的内核留余量（原值 32MB）。
+        sed -i 's/^CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=64/' full.config
+        grep -q '^CONFIG_TARGET_KERNEL_PARTSIZE=' full.config \
+          || echo 'CONFIG_TARGET_KERNEL_PARTSIZE=64' >> full.config
+
+        echo "--> 补丁结果："
+        grep -nE '^CONFIG_KERNEL_FUNCTION_TRACER=|^CONFIG_TARGET_KERNEL_PARTSIZE=' full.config
+
+        # 3) 若上游带来了别的变化或补丁改动了文件，回写 fork 仓库，便于下次增量
+        git add -A
+        if git diff --cached --quiet; then
+          echo "--> 配置无变化，跳过提交"
+        else
+          git commit -m "chore: keep FUNCTION_TRACER enabled + kernel 64MB"
+          git push origin HEAD:main || echo "::warning::推送失败（可能无写权限），本次构建仍使用本地改动"
+        fi
 
     - name: 释放 Runner 磁盘空间 (Free Disk Space)
       run: |
