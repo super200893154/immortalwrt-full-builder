@@ -79,11 +79,18 @@ jobs:
         echo "=================================================="
         echo "--> 应用内核补丁"
         echo "=================================================="
-        # 1) 开启 ftrace 函数追踪器：honk(dae) 用 raw tracepoint 挂 __skb_recv_udp，
-        #    缺此项时 available_tracers 只剩 nop，UDP 接管报 Resource busy。
+        # 1) 开启 ftrace 函数追踪器：honk(dae) 的函数级 eBPF 挂载（fentry/fexit）依赖它，
+        #    缺此项时 available_tracers 只剩 nop。
         sed -i 's/^# CONFIG_KERNEL_FUNCTION_TRACER is not set/CONFIG_KERNEL_FUNCTION_TRACER=y/' full.config
         grep -q '^CONFIG_KERNEL_FUNCTION_TRACER=y' full.config \
           || echo 'CONFIG_KERNEL_FUNCTION_TRACER=y' >> full.config
+
+        # 1b) 开启动态函数追踪：honk 的 UDP receive trace 用 fentry/fexit 挂
+        #     udp_recvmsg/udpv6_recvmsg/__skb_recv_udp，依赖 CONFIG_DYNAMIC_FTRACE。
+        #     缺此项时面板持续报 "内核 UDP 跟踪不可用"（udp_trace_unavailable）。
+        sed -i 's/^# CONFIG_KERNEL_DYNAMIC_FTRACE is not set/CONFIG_KERNEL_DYNAMIC_FTRACE=y/' full.config
+        grep -q '^CONFIG_KERNEL_DYNAMIC_FTRACE=y' full.config \
+          || echo 'CONFIG_KERNEL_DYNAMIC_FTRACE=y' >> full.config
 
         # 2) 内核分区 64MB，给开启 ftrace 后增大的内核留余量（原值 32MB）。
         sed -i 's/^CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=64/' full.config
@@ -91,7 +98,7 @@ jobs:
           || echo 'CONFIG_TARGET_KERNEL_PARTSIZE=64' >> full.config
 
         echo "--> 补丁结果："
-        grep -nE '^CONFIG_KERNEL_FUNCTION_TRACER=|^CONFIG_TARGET_KERNEL_PARTSIZE=' full.config
+        grep -nE '^CONFIG_KERNEL_FUNCTION_TRACER=|^CONFIG_KERNEL_DYNAMIC_FTRACE=|^CONFIG_TARGET_KERNEL_PARTSIZE=' full.config
 
         # 3) 若上游带来了别的变化或补丁改动了文件，回写 fork 仓库，便于下次增量
         git add -A
