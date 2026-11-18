@@ -14,10 +14,8 @@ on:
         required: false
         default: true
         type: boolean
-  schedule:
-    # 每天北京时间 04:00 (UTC 20:00) 自动编译。
-    # 比作者仓库(UTC 19:00)晚 1 小时，确保上游已推送新代码后再同步构建。
-    - cron: '0 20 * * *'
+  # 定时构建已移除：改为在 Actions 页面手动 Run workflow。
+  # 每次手动触发都会先「同步上游 + 打补丁」，因此拿到的仍是上游最新代码。
 
 permissions:
   contents: write
