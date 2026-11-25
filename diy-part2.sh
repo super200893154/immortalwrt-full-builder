@@ -131,7 +131,7 @@ if grep -q "CONFIG_PACKAGE_luci-app-honk=y" .config 2>/dev/null || grep -q "CONF
   mkdir -p files/etc/apk/repositories.d/
   touch files/etc/apk/repositories.d/customfeeds.list
   if ! grep -q "@honk" files/etc/apk/repositories.d/customfeeds.list 2>/dev/null; then
-    echo "@honk https://down.dllkids.xyz/openwrt-feed/25.12/x86_64/packages.adb" >> files/etc/apk/repositories.d/customfeeds.list
+    echo "@honk https://super200893154.github.io/openwrt-honk/25.12/x86_64/packages.adb" >> files/etc/apk/repositories.d/customfeeds.list
   fi
 fi
 
