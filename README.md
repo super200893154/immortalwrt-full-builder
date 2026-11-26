@@ -1,6 +1,6 @@
 # 🔥 ImmortalWrt 25.12.2 x86_64 全能功能版自动化编译 (full.config)
 
-基于官方 **ImmortalWrt 25.12 稳定维护分支 (`openwrt-25.12`)** 与 **Linux 6.12 LTS 稳定内核**，采用全量功能配置 `full.config`，集成纯血原生 eBPF (Daede / Honk) 双引擎、突破 208KB 套接字限制、纯净现代 Firewall4 以及开机自愈网络适配。
+基于官方 **ImmortalWrt 25.12 稳定维护分支 (`openwrt-25.12`)** 与 **Linux 6.12 LTS 稳定内核**，采用全量功能配置 `full.config`，集成纯血原生 eBPF (Honk) 透明代理引擎、突破 208KB 套接字限制、纯净现代 Firewall4 以及开机自愈网络适配。
 
 **本仓库为公开纯净开源仓库，享受 GitHub Actions 无限免费编译时长！**
 
@@ -11,8 +11,8 @@
 - **编译配置**：`full.config`（全功能全量版）
 - **内核驱动**：Linux 6.12 LTS（硬核开启 `CONFIG_KERNEL_DEBUG_INFO_BTF=y` 原生 BTF）
 - **网络调优**：套接字收发缓冲跃升至 64MB (`99-custom-network-tuning.conf`)，突破 BDP 物理限制，单连接理论吞吐暴增 315 倍
-- **透明代理**：Daede 原生 eBPF 与 Honk 新代 Rust eBPF 双引擎按需选用
-- **官方隔离**：独家 `@daed` / `@honk` apk 软件源命名空间沙箱隔离与 `package-manager-call` 智能过滤，杜绝魔改包污染官方源
+- **透明代理**：Honk 新代 Rust eBPF 引擎
+- **官方隔离**：独家 `@honk` apk 软件源命名空间沙箱隔离与 `package-manager-call` 智能过滤，杜绝魔改包污染官方源
 - **防火墙**：100% 现代 Firewall4 (fw4) + Nftables + 双向 FullCone NAT1
 - **远程互联**：原生 Linux 内核态 WireGuard (kmod-wireguard)，全速线速转发，与透明代理秋毫无犯
 - **存储扩展**：集成 FUSE 3 全栈 (`kmod-fuse`, `libfuse3`, `fuse3-utils`)，Docker 容器联动秒变轻 NAS
